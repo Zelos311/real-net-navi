@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -set -o pipefail
+set -o pipefail
 
 HUB="$HOME/.lamp-hub"
 LOG="$HUB/logs"
