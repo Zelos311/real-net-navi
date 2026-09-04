@@ -6,6 +6,7 @@ LOG="$HUB/logs"
 TOKEN_FILE="$HUB/relay-token"
 HANDSHAKE_FILE="$HUB/handshake.json"
 DISPLAY_NUM="${DISPLAY:-:1}"
+MAKE_HEARTBEAT_HOOK="${LAMP_HUB_HOOK:-https://hook.us2.make.com/vse7mcseyuczci5j3nw87ucyjyx0wneo}"
 mkdir -p "$LOG"
 
 if [ ! -s "$TOKEN_FILE" ]; then
@@ -18,23 +19,27 @@ fi
 TOKEN="$(cat "$TOKEN_FILE")"
 
 if ! pgrep -f "Xvfb ${DISPLAY_NUM}" >/dev/null 2>&1; then
-  nohup Xvfb "$DISPLAY_NUM" -screen 0 1280x720x24 -ac +extension GLX +render -noreset     >"$LOG/xvfb.log" 2>&1 &
+  nohup Xvfb "$DISPLAY_NUM" -screen 0 1280x720x24 -ac +extension GLX +render -noreset >"$LOG/xvfb.log" 2>&1 &
   sleep 2
+else
+  true
 fi
 
 if ! pgrep -f "openbox-session" >/dev/null 2>&1; then
-  nohup env DISPLAY="$DISPLAY_NUM" dbus-launch --exit-with-session openbox-session     >"$LOG/openbox.log" 2>&1 &
+  nohup env DISPLAY="$DISPLAY_NUM" dbus-launch --exit-with-session openbox-session >"$LOG/openbox.log" 2>&1 &
 fi
 
 if ! pgrep -f "x11vnc.*${DISPLAY_NUM}" >/dev/null 2>&1; then
-  nohup x11vnc -display "$DISPLAY_NUM" -forever -shared -nopw -localhost     >"$LOG/x11vnc.log" 2>&1 &
+  nohup x11vnc -display "$DISPLAY_NUM" -forever -shared -nopw -localhost >"$LOG/x11vnc.log" 2>&1 &
 fi
-
 if ! pgrep -f "websockify.*6080" >/dev/null 2>&1; then
-  nohup websockify --web=/usr/share/novnc 6080 localhost:5900     >"$LOG/novnc.log" 2>&1 &
+  nohup websockify --web=/usr/share/novnc 6080 localhost:5900 >"$LOG/novnc.log" 2>&1 &
 fi
 
-CIPHER="$(printf '%s' "$TOKEN" | openssl pkeyutl -encrypt   -pubin -inkey .devcontainer/make-public.pem   -pkeyopt rsa_padding_mode:oaep   -pkeyopt rsa_oaep_md:sha256 | base64 -w0)"
+CIPHER="$(printf '%s' "$TOKEN" | openssl pkeyutl -encrypt \
+  -pubin -inkey .devcontainer/make-public.pem \
+  -pkeyopt rsa_padding_mode:oaep \
+  -pkeyopt rsa_oaep_md:sha256 | base64 -w0)"
 
 PORT_DOMAIN="${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"
 RELAY_URL="https://${CODESPACE_NAME}-8787.${PORT_DOMAIN}"
@@ -57,17 +62,21 @@ PY
 chmod 600 "$HANDSHAKE_FILE"
 
 if ! pgrep -f "lamp-relay.py" >/dev/null 2>&1; then
-  nohup env     DISPLAY="$DISPLAY_NUM"     LAMP_HUB_TOKEN="$TOKEN"     LAMP_HUB_PORT=8787     LIBGL_ALWAYS_SOFTWARE=1     QT_XCB_GL_INTEGRATION=none     python3 .devcontainer/lamp-relay.py     >"$LOG/relay.log" 2>&1 &
+  nohup env \
+    DISPLAY="$DISPLAY_NUM" \
+    LAMP_HUB_TOKEN="$TOKEN" \
+    LAMP_HUB_PORT=8787 \
+    LIBGL_ALWAYS_SOFTWARE=1 \
+    QT_XCB_GL_INTEGRATION=none \
+    python3 .devcontainer/lamp-relay.py \
+    >"$LOG/relay.log" 2>&1 &
 fi
 
-if [ -n "${LAMP_HUB_HOOK:-}" ]; then
-  if ! pgrep -f ".devcontainer/make-poller.sh" >/dev/null 2>&1; then
-    nohup bash .devcontainer/make-poller.sh "$LAMP_HUB_HOOK"       >"$LOG/make-poller.log" 2>&1 &
-  fi
-  echo "[Lamp Hub] Make heartbeat enabled."
-else
-  echo "[Lamp Hub] LAMP_HUB_HOOK is not set; Make heartbeat disabled."
+if ! pgrep -f ".devcontainer/make-poller.sh" >/dev/null 2>&1; then
+  nohup bash .devcontainer/make-poller.sh "$MAKE_HEARTBEAT_HOOK" \
+    >"$LOG/make-poller.log" 2>&1 &
 fi
+echo "[Lamp Hub] Make heartbeat enabled."
 
 echo "[Lamp Hub] Online."
 echo "[Lamp Hub] Relay listener ready on port 8787."
