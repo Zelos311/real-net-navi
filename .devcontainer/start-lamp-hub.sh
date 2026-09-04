@@ -29,6 +29,7 @@ fi
 if ! pgrep -f "x11vnc.*${DISPLAY_NUM}" >/dev/null 2>&1; then
   nohup x11vnc -display "$DISPLAY_NUM" -forever -shared -nopw -localhost     >"$LOG/x11vnc.log" 2>&1 &
 fi
+
 if ! pgrep -f "websockify.*6080" >/dev/null 2>&1; then
   nohup websockify --web=/usr/share/novnc 6080 localhost:5900     >"$LOG/novnc.log" 2>&1 &
 fi
@@ -57,6 +58,15 @@ chmod 600 "$HANDSHAKE_FILE"
 
 if ! pgrep -f "lamp-relay.py" >/dev/null 2>&1; then
   nohup env     DISPLAY="$DISPLAY_NUM"     LAMP_HUB_TOKEN="$TOKEN"     LAMP_HUB_PORT=8787     LIBGL_ALWAYS_SOFTWARE=1     QT_XCB_GL_INTEGRATION=none     python3 .devcontainer/lamp-relay.py     >"$LOG/relay.log" 2>&1 &
+fi
+
+if [ -n "${LAMP_HUB_HOOK:-}" ]; then
+  if ! pgrep -f ".devcontainer/make-poller.sh" >/dev/null 2>&1; then
+    nohup bash .devcontainer/make-poller.sh "$LAMP_HUB_HOOK"       >"$LOG/make-poller.log" 2>&1 &
+  fi
+  echo "[Lamp Hub] Make heartbeat enabled."
+else
+  echo "[Lamp Hub] LAMP_HUB_HOOK is not set; Make heartbeat disabled."
 fi
 
 echo "[Lamp Hub] Online."
