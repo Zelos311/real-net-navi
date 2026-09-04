@@ -3,19 +3,19 @@
   "bridge": "lamp-hub",
   "mode": "ledger-v1",
   "action": {
-    "id": "ledger-test-20260904-0600",
+    "id": "closed-loop-status-20260904-0655",
     "name": "hub_status"
   },
   "ledger": {
     "protocol": "lamp-command-ledger-v1",
     "pending": [
       {
-        "id": "ledger-test-20260904-0600",
+        "id": "closed-loop-status-20260904-0655",
         "name": "hub_status",
         "status": "queued"
       }
     ],
     "completed": [],
-    "updated_at": "2026-09-04T06:00:00Z"
+    "updated_at": "2026-09-04T06:55:00Z"
   }
 }
