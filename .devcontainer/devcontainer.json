@@ -1,0 +1,17 @@
+{
+  "name": "Lamp Hub v0",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb",
+    "storage": "32gb"
+  },
+  "forwardPorts": [6080, 8787],
+  "portsAttributes": {
+    "6080": {"label": "Lamp Hub Desktop", "onAutoForward": "silent"},
+    "8787": {"label": "Genie Control Relay", "onAutoForward": "silent"}
+  },
+  "postCreateCommand": "bash .devcontainer/bootstrap.sh",
+  "postStartCommand": "bash .devcontainer/start-lamp-hub.sh",
+  "remoteEnv": {"DISPLAY": ":1"}
+}
