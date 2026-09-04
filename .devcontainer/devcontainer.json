@@ -8,10 +8,20 @@
   },
   "forwardPorts": [6080, 8787],
   "portsAttributes": {
-    "6080": {"label": "Lamp Hub Desktop", "onAutoForward": "silent"},
-    "8787": {"label": "Genie Control Relay", "onAutoForward": "silent"}
+    "6080": {
+      "label": "Lamp Hub Desktop",
+      "onAutoForward": "silent"
+    },
+    "8787": {
+      "label": "Genie Control Relay",
+      "onAutoForward": "silent"
+    }
   },
   "postCreateCommand": "bash .devcontainer/bootstrap.sh",
   "postStartCommand": "bash .devcontainer/start-lamp-hub.sh",
-  "remoteEnv": {"DISPLAY": ":1"}
+  "remoteEnv": {
+    "DISPLAY": ":1",
+    "LIBGL_ALWAYS_SOFTWARE": "1",
+    "QT_XCB_GL_INTEGRATION": "none"
+  }
 }
