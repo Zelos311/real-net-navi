@@ -21,8 +21,6 @@ TOKEN="$(cat "$TOKEN_FILE")"
 if ! pgrep -f "Xvfb ${DISPLAY_NUM}" >/dev/null 2>&1; then
   nohup Xvfb "$DISPLAY_NUM" -screen 0 1280x720x24 -ac +extension GLX +render -noreset >"$LOG/xvfb.log" 2>&1 &
   sleep 2
-else
-  true
 fi
 
 if ! pgrep -f "openbox-session" >/dev/null 2>&1; then
@@ -61,23 +59,30 @@ with open(path, "w") as f:
 PY
 chmod 600 "$HANDSHAKE_FILE"
 
-if ! pgrep -f "lamp-relay.py" >/dev/null 2>&1; then
-  nohup env \
-    DISPLAY="$DISPLAY_NUM" \
-    LAMP_HUB_TOKEN="$TOKEN" \
-    LAMP_HUB_PORT=8787 \
-    LIBGL_ALWAYS_SOFTWARE=1 \
-    QT_XCB_GL_INTEGRATION=none \
-    python3 .devcontainer/lamp-relay.py \
-    >"$LOG/relay.log" 2>&1 &
+# Restart the relay after repo updates so the running process always matches the current allowlist.
+if pgrep -f "lamp-relay.py" >/dev/null 2>&1; then
+  pkill -TERM -f "lamp-relay.py" || true
+  sleep 1
 fi
+nohup env \
+  DISPLAY="$DISPLAY_NUM" \
+  LAMP_HUB_TOKEN="$TOKEN" \
+  LAMP_HUB_PORT=8787 \
+  LIBGL_ALWAYS_SOFTWARE=1 \
+  QT_XCB_GL_INTEGRATION=none \
+  python3 .devcontainer/lamp-relay.py \
+  >"$LOG/relay.log" 2>&1 &
 
-if ! pgrep -f ".devcontainer/make-poller.sh" >/dev/null 2>&1; then
-  nohup bash .devcontainer/make-poller.sh "$MAKE_HEARTBEAT_HOOK" \
-    >"$LOG/make-poller.log" 2>&1 &
+# Restart the outbound poller after repo updates for the same reason.
+if pgrep -f ".devcontainer/make-poller.sh" >/dev/null 2>&1; then
+  pkill -TERM -f ".devcontainer/make-poller.sh" || true
+  sleep 1
 fi
-echo "[Lamp Hub] Make heartbeat enabled."
+nohup bash .devcontainer/make-poller.sh "$MAKE_HEARTBEAT_HOOK" \
+  >"$LOG/make-poller.log" 2>&1 &
 
+echo "[Lamp Hub] Make control channel enabled."
+echo "[Lamp Hub] Allowlisted actions: hub_status, desktop_windows, launch_krita, focus_krita, stop_krita, snapshot."
 echo "[Lamp Hub] Online."
 echo "[Lamp Hub] Relay listener ready on port 8787."
 echo "[Lamp Hub] Desktop listener ready on port 6080."
