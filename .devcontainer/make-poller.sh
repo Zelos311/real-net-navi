@@ -30,6 +30,28 @@ RESULT_OUTPUT=""
 
 echo "[Lamp Hub] Make control poller starting as $CLIENT_ID"
 
+gba_focus() {
+  env DISPLAY="${DISPLAY:-:1}" wmctrl -a "GBA Online" >/dev/null 2>&1 ||
+  env DISPLAY="${DISPLAY:-:1}" wmctrl -a "pokemongreen" >/dev/null 2>&1 ||
+  env DISPLAY="${DISPLAY:-:1}" wmctrl -a "Google Chrome" >/dev/null 2>&1 ||
+  true
+}
+
+gba_key() {
+  local key="$1"
+  gba_focus
+  sleep 0.15
+  env DISPLAY="${DISPLAY:-:1}" xdotool key --clearmodifiers "$key"
+}
+
+gba_frame() {
+  local shot="$HUB/gba-frame.jpg"
+  env DISPLAY="${DISPLAY:-:1}" scrot -z -o "$shot"
+  convert "$shot" -resize '320x180>' -quality 28 "$shot"
+  printf 'data:image/jpeg;base64,'
+  base64 -w0 "$shot"
+}
+
 run_action() {
   local name="$1"
   case "$name" in
@@ -42,6 +64,7 @@ run_action() {
         echo "relay=$(pgrep -f 'lamp-relay.py' >/dev/null 2>&1 && echo online || echo offline)"
         echo "poller=online"
         echo "krita=$(pgrep -x krita >/dev/null 2>&1 && echo running || echo stopped)"
+        echo "chrome=$(pgrep -f 'google-chrome.*gba-chrome' >/dev/null 2>&1 && echo running || echo stopped)"
       }
       ;;
     desktop_windows)
@@ -74,6 +97,109 @@ run_action() {
       echo "path=$shot"
       echo "bytes=$(stat -c %s "$shot")"
       echo "sha256=$(sha256sum "$shot" | awk '{print $1}')"
+      ;;
+
+    gba_setup)
+      if ! command -v google-chrome >/dev/null 2>&1; then
+        echo "Installing Google Chrome..."
+        tmpdeb="$(mktemp --suffix=.deb)"
+        curl -fL --retry 3 --connect-timeout 20 \
+          -o "$tmpdeb" \
+          "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+        sudo apt-get update
+        sudo apt-get install -y "$tmpdeb"
+        rm -f "$tmpdeb"
+      fi
+      mkdir -p "$HUB/gba-chrome"
+      if ! pgrep -f 'google-chrome.*gba-chrome' >/dev/null 2>&1; then
+        nohup env DISPLAY="${DISPLAY:-:1}" \
+          google-chrome \
+          --no-sandbox \
+          --disable-dev-shm-usage \
+          --disable-gpu \
+          --disable-software-rasterizer=false \
+          --user-data-dir="$HUB/gba-chrome" \
+          --window-size=1000,700 \
+          --app="https://gba.js.org/player/#pokemongreen" \
+          >"$LOG/gba-chrome.log" 2>&1 &
+        echo "GBA browser launch requested; pid=$!"
+      else
+        echo "GBA browser already running."
+      fi
+      sleep 10
+      gba_focus
+      env DISPLAY="${DISPLAY:-:1}" wmctrl -lx 2>&1 | tail -n 20
+      ;;
+    gba_open)
+      if ! command -v google-chrome >/dev/null 2>&1; then
+        echo "Google Chrome is not installed; run gba_setup first." >&2
+        return 65
+      fi
+      pkill -TERM -f 'google-chrome.*gba-chrome' >/dev/null 2>&1 || true
+      sleep 2
+      nohup env DISPLAY="${DISPLAY:-:1}" \
+        google-chrome \
+        --no-sandbox \
+        --disable-dev-shm-usage \
+        --disable-gpu \
+        --user-data-dir="$HUB/gba-chrome" \
+        --window-size=1000,700 \
+        --app="https://gba.js.org/player/#pokemongreen" \
+        >"$LOG/gba-chrome.log" 2>&1 &
+      sleep 8
+      gba_focus
+      echo "GBA Online opened."
+      ;;
+    gba_status)
+      echo "chrome=$(pgrep -f 'google-chrome.*gba-chrome' >/dev/null 2>&1 && echo running || echo stopped)"
+      env DISPLAY="${DISPLAY:-:1}" wmctrl -lx 2>&1 | tail -n 20
+      ;;
+    gba_frame)
+      gba_frame
+      ;;
+    gba_play)
+      gba_key p
+      echo "pressed=PLAY"
+      ;;
+    gba_up)
+      gba_key Up
+      echo "pressed=UP"
+      ;;
+    gba_down)
+      gba_key Down
+      echo "pressed=DOWN"
+      ;;
+    gba_left)
+      gba_key Left
+      echo "pressed=LEFT"
+      ;;
+    gba_right)
+      gba_key Right
+      echo "pressed=RIGHT"
+      ;;
+    gba_a)
+      gba_key z
+      echo "pressed=A"
+      ;;
+    gba_b)
+      gba_key x
+      echo "pressed=B"
+      ;;
+    gba_l)
+      gba_key a
+      echo "pressed=L"
+      ;;
+    gba_r)
+      gba_key s
+      echo "pressed=R"
+      ;;
+    gba_start)
+      gba_key Return
+      echo "pressed=START"
+      ;;
+    gba_select)
+      gba_key BackSpace
+      echo "pressed=SELECT"
       ;;
     *)
       echo "unsupported action: $name" >&2
@@ -128,7 +254,6 @@ except Exception: print("")' 2>/dev/null)"
   RESULT_OUTPUT=""
 
   if [ -n "$ACTION_ID" ] && [ -n "$ACTION_NAME" ] && [ "$ACTION_ID" != "$LAST_ACTION_ID" ]; then
-    # At-most-once semantics: record the id before executing the fixed allowlisted action.
     LAST_ACTION_ID="$ACTION_ID"
     printf '%s' "$LAST_ACTION_ID" > "$LAST_ACTION_FILE"
 
