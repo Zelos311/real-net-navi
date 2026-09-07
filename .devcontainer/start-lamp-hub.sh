@@ -34,6 +34,11 @@ if ! pgrep -f "websockify.*6080" >/dev/null 2>&1; then
   nohup websockify --web=/usr/share/novnc 6080 localhost:5900 >"$LOG/novnc.log" 2>&1 &
 fi
 
+# Re-open the two intended Lamp Hub ports on every Codespace wake.
+if command -v gh >/dev/null 2>&1 && [ -n "${CODESPACE_NAME:-}" ]; then
+  gh codespace ports visibility 6080:public 8787:public -c "$CODESPACE_NAME" >"$LOG/port-visibility.log" 2>&1 || true
+fi
+
 CIPHER="$(printf '%s' "$TOKEN" | openssl pkeyutl -encrypt \
   -pubin -inkey .devcontainer/make-public.pem \
   -pkeyopt rsa_padding_mode:oaep \
